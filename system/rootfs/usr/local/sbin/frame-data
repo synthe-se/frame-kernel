@@ -3,6 +3,7 @@
 # clock, the journal, the SSH host key, the Wi-Fi it joined. A frame that kept them under its first
 # product's name has them brought over once.
 set -eu
+# shellcheck source=system/rootfs/usr/local/lib/frame-slots
 . /usr/local/lib/frame-slots
 old=/android-data/maison
 new=/android-data/frame

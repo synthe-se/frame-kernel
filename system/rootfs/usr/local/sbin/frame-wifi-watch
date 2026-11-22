@@ -6,6 +6,7 @@
 # its network. All of it lives in /run: a restart is a frame as configured. An update on trial stays
 # frame-commit's to judge.
 set -eu
+# shellcheck source=system/rootfs/usr/local/lib/frame-slots
 . /usr/local/lib/frame-slots
 step=15
 patience=600

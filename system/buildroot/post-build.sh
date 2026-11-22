@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2153,SC2154  # what the product says of itself comes from /product.env
 # What the overlay cannot say: the product (its files, its name, its units), the frame's tools, who
 # may come in, the journal kept on userdata, the names OpenSSH uses, the units enabled. $1 is the
 # target's root; bin/system.sh leaves what it built in /tmp, the product's files in /staging and
@@ -34,8 +35,8 @@ if [ -n "${UPDATE_URL-}" ]; then
 	printf '%s' "$UPDATE_URL" >"$root/etc/frame/update-url"
 	install -m 0644 /release.pub "$root/etc/frame/release.pub"
 fi
-printf '%s\n' "$HOSTNAME" >"$root/etc/hostname"
-sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME/" "$root/etc/hosts"
+printf '%s\n' "$HOST" >"$root/etc/hostname"
+sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$HOST/" "$root/etc/hosts"
 # who may come in: the CA's certificates, no key on the frame (bin/ssh-cert.sh)
 install -m 0644 /ssh-ca.pub "$root/etc/ssh/frame-ca.pub"
 # one known board: no table of the world's hardware (the option alone leaves what systemd installed)

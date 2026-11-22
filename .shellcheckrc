@@ -1,0 +1,4 @@
+# Sourced files are named by paths made at run time; the ones that matter are named beside their
+# `.` (source=). What is quoted for the frame's shell is meant to expand there, not here.
+disable=SC1090,SC1091,SC2016,SC2029
+external-sources=true

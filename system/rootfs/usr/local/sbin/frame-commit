@@ -4,6 +4,7 @@
 # counts as good: an update on trial is kept, the active slot's boots go back to zero. Else, after
 # 150 s, a restart: the initramfs counts it, and comes back to the slot before.
 set -eu
+# shellcheck source=system/rootfs/usr/local/lib/frame-slots
 . /usr/local/lib/frame-slots
 [ -s "$state" ] || exit 0
 
@@ -27,8 +28,9 @@ healthy() {
 learn() {
 	known=/android-data/frame/wifi.known
 	guess=/run/systemd/network/40-wlan0-known.network
-	lease=$(ls /run/systemd/netif/leases/* 2>/dev/null | head -1)
-	[ -s "$lease" ] || return 0
+	lease=
+	for held in /run/systemd/netif/leases/*; do [ ! -s "$held" ] || { lease=$held; break; }; done
+	[ -n "$lease" ] || return 0
 	joined=$(journalctl -b -u frame-wpa -o cat | grep "Trying to associate" | tail -1)
 	ssid=$(printf '%s' "$joined" | sed -n "s/.*SSID='\\(.*\\)' freq=[0-9]* MHz.*/\\1/p")
 	freq=$(printf '%s' "$joined" | sed -n "s/.* freq=\\([0-9]*\\) MHz.*/\\1/p")

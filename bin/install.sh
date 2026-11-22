@@ -40,7 +40,7 @@ fi
 "$REPO/bin/sign.sh" "$PRODUCT" "$(cat "$REPO/build/$NAME/version")" "$dir"
 cat "$REPO/build/$NAME/version" >"$dir/version"
 # for a frame whose `boot` is from before the manifests: its sums
-(cd "$dir" && shasum -a 256 -- rootfs.squashfs splash.raw splash.conf $([ ! -e zImage ] || echo zImage board.dtb initramfs.cpio.gz) >sums)
+(cd "$dir" && for f in rootfs.squashfs splash.raw splash.conf zImage board.dtb initramfs.cpio.gz; do [ ! -e "$f" ] || shasum -a 256 -- "$f"; done >sums)
 for f in "$dir"/*; do "$REPO/bin/send.sh" "$f" "$slots/$slot/$(basename "$f")"; done
 c "$tool offer $slot" 60
 echo "$NAME $(cat "$REPO/build/$NAME/version"): slot $slot, tried at the next boot"

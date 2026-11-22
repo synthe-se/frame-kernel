@@ -22,7 +22,7 @@ frame_find() {
 	if [ -n "${FRAME_HOST-}" ]; then FRAME=$FRAME_HOST; return 0; fi
 	local kept="$frame_bin/../build/host" name
 	if [ -s "$kept" ] && frame_answers "$(cat "$kept")"; then FRAME=$(cat "$kept"); return 0; fi
-	for name in $(sed -n "s/^HOSTNAME='\(.*\)'$/\1.local/p" "$frame_bin"/../build/*/product.env 2>/dev/null) maison-frame.local; do
+	for name in $(sed -n "s/^HOST='\(.*\)'$/\1.local/p" "$frame_bin"/../build/*/product.env 2>/dev/null) maison-frame.local; do
 		if frame_answers "$name"; then
 			# its IPv4 address, when the name gives one
 			FRAME=$(python3 -c 'import socket, sys; print(socket.gethostbyname(sys.argv[1]))' "$name" 2>/dev/null || echo "$name")

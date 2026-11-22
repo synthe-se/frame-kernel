@@ -60,7 +60,7 @@ A directory of the product's repository. The frame's system is built around it:
 |---|---|
 | `NAME` | lower case; names its build (`build/<NAME>`) |
 | `TITLE` | as a person reads it; names the frame's own Wi-Fi |
-| `HOSTNAME` | the frame answers as `<HOSTNAME>.local` |
+| `HOST` | the frame answers as `<HOST>.local` |
 | `UNIT` | the unit a boot is judged on: 45 s running without a restart and the system is kept |
 | `HEARTBEAT` | a file the product touches while it draws, if it wants to be judged on that too |
 | `TURN` | how its picture lies on the panel, a quarter clockwise at a time: 0, 90, 180, 270 |

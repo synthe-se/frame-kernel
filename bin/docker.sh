@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced by the frame's Docker builds: Docker must answer before anything waits on it (a hung
 # Docker Desktop makes every docker command wait forever, silently).
 docker_answers() {

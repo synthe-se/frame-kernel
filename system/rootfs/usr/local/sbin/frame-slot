@@ -2,6 +2,7 @@
 # The slots from the system: `free` says the slot an update may fill, `offer <slot>` puts it on
 # trial, `good` records that the running system proved itself (frame-commit).
 set -eu
+# shellcheck source=system/rootfs/usr/local/lib/frame-slots
 . /usr/local/lib/frame-slots
 case "${1:-}" in
 free)

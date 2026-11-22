@@ -58,7 +58,7 @@ class Text(unittest.TestCase):
         boot = initramfs.init(False)
         self.assertIn(initramfs.SLOTS, boot)
         self.assertIn("printf 'active=%s\\npending=%s\\ntries=%s\\nboots=%s\\n'", boot)
-        self.assertIn("sync && mv $state.new $state && sync", boot)
+        self.assertIn('sync && mv "$state.new" "$state" && sync', boot)
 
     def test_a_power_cut_finds_userdata_looked_at_and_closed_to_devices_and_programs(self):
         boot = initramfs.init(False)
@@ -142,7 +142,7 @@ class Boot(unittest.TestCase):
             frame_seal='shift; whole=; [ "$1" != --whole ] || { whole=1; shift; }; [ -s "$1/rootfs.squashfs" ] || exit 1; [ -n "$whole" ] || exit 0; echo "sums $(basename "$1") $2" >>$LOG; [ ! -e "$1/bad" ]',
         )
         text = rooted(initramfs.init(False), root, *self.PATHS, "keys").replace("export PATH=/bin", f"export PATH={root}/stubs:$PATH")
-        text = text.replace("seal=/usr/local/bin/frame-seal\n[ -x $seal ] || seal=/bin/frame-seal", "seal=frame-seal")
+        text = text.replace('seal=/usr/local/bin/frame-seal\n[ -x "$seal" ] || seal=/bin/frame-seal', "seal=frame-seal")
         text = text.replace(f" /bin/toybox {root}/kept/", f" {root}/stubs/toybox {root}/kept/")
         # a file stands for the framebuffer's device
         text = text.replace(f"[ -c {root}/dev/fb0 ]", f"[ -e {root}/dev/fb0 ]")

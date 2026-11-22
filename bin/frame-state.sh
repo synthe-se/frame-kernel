@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2034  # what it sets is read by the tools that source it
 # Sourced by the tools that change a frame's slots (install.sh, switch.sh, try.sh): what the frame
 # says of them, read whole or not at all. An answer that did not come is never an empty answer:
 # a trial that still runs must not pass for one that ended.
@@ -6,6 +7,7 @@
 # mounted (the slot the system that runs was started from) and running (its product).
 frame_slots() {
 	local said
+	slots='' active='' pending='' mounted='' running=''
 	said=$("$(dirname "${BASH_SOURCE[0]}")/console.sh" 'for lib in /usr/local/lib/frame-slots /usr/local/lib/maison-slots; do [ ! -e $lib ] || { . $lib; break; }; done
 echo "slots=$slots"
 echo "active=$(key active)"

@@ -69,4 +69,5 @@ boot-time:
 check:
     python3 -m unittest discover -s tests
     cd tools && cargo test --locked -q
+    cd tools/seal && cargo test --locked -q
     shellcheck -x -P bin bin/*.sh boot/tools.sh system/buildroot/post-build.sh system/rootfs/usr/local/sbin/* system/rootfs/usr/local/lib/frame-slots
