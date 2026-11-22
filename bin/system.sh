@@ -17,8 +17,8 @@ product "${1:?usage: bin/system.sh <product directory>}"
 HOME_DIR="${FRAME_HOME:-$HOME/maison-frame}"
 SRC="$HOME_DIR/src"
 OUT="$REPO/build/$NAME"
-VERSION=2026.08.1
-SHA256=34fb7bea8a213ffde39cc02e61703391560f26e0850f03138c722d0b09880f2b
+VERSION=2026.11-rc1
+SHA256=db0b851ad3e59e05e9bf09497211fa8510fa77c6b8774948a011838c8c584942
 RUST=$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' "$REPO/tools/Cargo.toml")
 TARGET=armv7-unknown-linux-gnueabihf
 SSH_CA="$HOME_DIR/keys/ssh_ca.pub"
