@@ -1,0 +1,19 @@
+#!/bin/sh
+# What the frame keeps on userdata (frame-data.service), under /android-data/frame: the slots, the
+# clock, the journal, the SSH host key, the Wi-Fi it joined. A frame that kept them under its first
+# product's name has them brought over once.
+set -eu
+. /usr/local/lib/frame-slots
+old=/android-data/maison
+new=/android-data/frame
+settle
+install -d -o root -g root -m 0755 "$new"
+for kept in wifi.conf ssh timesync; do
+	[ -e "$new/$kept" ] || [ ! -e "$old/$kept" ] || cp -a "$old/$kept" "$new/$kept"
+done
+install -d -o systemd-timesync -g systemd-timesync -m 0755 "$new/timesync"
+# its clock file too: the user's number changes with the system
+chown -R systemd-timesync:systemd-timesync "$new/timesync"
+install -d -o root -g systemd-journal -m 2755 "$new/journal"
+install -d -o root -g root -m 0700 "$new/ssh"
+test -s "$new/ssh/ssh_host_ed25519_key" || ssh-keygen -q -t ed25519 -N "" -C "$(cat /etc/hostname)" -f "$new/ssh/ssh_host_ed25519_key"

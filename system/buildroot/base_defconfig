@@ -1,0 +1,61 @@
+# The frame's system: Buildroot, every program built for its Cortex-A7. The kernel and the initramfs
+# are bin/kernel.sh's; this makes the read-only squashfs they start (bin/system.sh). What every
+# product runs on: a product's own packages come after, from its `defconfig`.
+
+# Four Cortex-A7 with NEON: all of the system tuned for them
+BR2_arm=y
+BR2_cortex_a7=y
+BR2_ARM_FPU_NEON_VFPV4=y
+BR2_TOOLCHAIN_BUILDROOT_GLIBC=y
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+BR2_GCC_VERSION_16_X=y
+BR2_OPTIMIZE_2=y
+BR2_TIME_BITS_64=y
+
+# systemd, the units of system/rootfs; root has no password, the frame has no login prompt
+BR2_INIT_SYSTEMD=y
+# the initramfs mounts a tmpfs over the system: nothing is left to do for / or /var
+# BR2_TARGET_GENERIC_REMOUNT_ROOTFS_RW is not set
+BR2_INIT_SYSTEMD_VAR_NONE=y
+BR2_TARGET_GENERIC_ISSUE=""
+# BR2_TARGET_ENABLE_ROOT_LOGIN is not set
+BR2_TARGET_GENERIC_GETTY_PORT=""
+BR2_SYSTEM_DHCP=""
+BR2_TARGET_TZ_INFO=y
+BR2_TARGET_TZ_ZONELIST="europe"
+BR2_TARGET_LOCALTIME="Europe/Paris"
+BR2_ROOTFS_OVERLAY="/frame/system/rootfs"
+BR2_ROOTFS_USERS_TABLES="/frame/system/buildroot/users.table"
+BR2_ROOTFS_POST_BUILD_SCRIPT="/frame/system/buildroot/post-build.sh"
+BR2_PACKAGE_SYSTEMD_NETWORKD=y
+BR2_PACKAGE_SYSTEMD_RESOLVED=y
+BR2_PACKAGE_SYSTEMD_TIMESYNCD=y
+BR2_PACKAGE_SYSTEMD_ANALYZE=y
+# one known board, one product on its panel, nobody at a keyboard: no table of the world's
+# hardware, no daemons to rename the host or set its clock by hand, no console font, no store for
+# a firmware's crashes
+# BR2_PACKAGE_SYSTEMD_HWDB is not set
+# BR2_PACKAGE_SYSTEMD_HOSTNAMED is not set
+# BR2_PACKAGE_SYSTEMD_TIMEDATED is not set
+# BR2_PACKAGE_SYSTEMD_VCONSOLE is not set
+# BR2_PACKAGE_SYSTEMD_PSTORE is not set
+# what SystemCallFilter= in the units is applied with
+BR2_PACKAGE_LIBSECCOMP=y
+
+# The Wi-Fi, SSH by key only, a new kernel tried in RAM
+BR2_PACKAGE_WPA_SUPPLICANT=y
+BR2_PACKAGE_WPA_SUPPLICANT_NL80211=y
+BR2_PACKAGE_WPA_SUPPLICANT_WPA3=y
+# mode=2: the frame's own Wi-Fi for its setup
+BR2_PACKAGE_WPA_SUPPLICANT_AP_SUPPORT=y
+BR2_PACKAGE_WPA_SUPPLICANT_CTRL_IFACE=y
+BR2_PACKAGE_OPENSSH=y
+# BR2_PACKAGE_OPENSSH_CLIENT is not set
+BR2_PACKAGE_OPENSSH_SERVER=y
+BR2_PACKAGE_OPENSSH_KEY_UTILS=y
+BR2_PACKAGE_KEXEC=y
+
+# Read-only, zstd: fast to read on the Cortex-A7
+BR2_TARGET_ROOTFS_SQUASHFS=y
+BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y
+# BR2_TARGET_ROOTFS_TAR is not set

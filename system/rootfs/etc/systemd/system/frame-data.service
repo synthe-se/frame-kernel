@@ -1,0 +1,18 @@
+# What the system keeps across power cuts, on userdata (the system itself lives in RAM): the
+# slots, where timesyncd keeps its clock (systemd-timesyncd.service.d/frame.conf), the journal
+# (/var/log/journal, a link there: a boot that went wrong can be read at the next one,
+# `journalctl -b -1`), the SSH host key (a key made at each boot would be a new host at each boot).
+# Early, as timesyncd itself (before sysinit.target): no default dependencies, which would order it
+# after sysinit.target and make a cycle systemd breaks by dropping timesyncd. tmpfiles refuses
+# these paths (through Android's /android-data, its uid's). Userdata is mounted before the system
+# starts: asking for its mount here would wait three seconds for udev to say so.
+[Unit]
+Description=What the frame keeps on userdata
+DefaultDependencies=no
+Before=systemd-timesyncd.service systemd-journal-flush.service sshd.service shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/frame-data

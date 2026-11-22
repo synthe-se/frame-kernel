@@ -1,0 +1,13 @@
+# The frame's network for this boot (usr/local/sbin/frame-wifi). Not RemainAfterExit:
+# restarting frame-wpa runs it again (frame-hotspot)
+# No default dependencies: those would hold the Wi-Fi back until udev has walked every device, three
+# seconds for an interface the initramfs brought up before the system started.
+[Unit]
+Description=The frame's network
+DefaultDependencies=no
+Before=frame-wpa.service systemd-networkd.service shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/frame-wifi

@@ -1,0 +1,5 @@
+# The initramfs's copy: a Cortex-A7, static against musl, linked by the toolchain's own lld with
+# musl's own start files: nothing of a C toolchain, nothing of the frame's system.
+[target.armv7-unknown-linux-musleabihf]
+linker = "rust-lld"
+rustflags = ["-C", "target-feature=+crt-static", "-C", "target-cpu=cortex-a7"]

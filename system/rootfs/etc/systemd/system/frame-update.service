@@ -1,0 +1,12 @@
+# A newer signed release, if there is one (tools: frame-update). /etc/frame/update-url names
+# where: a system built without it has no updates over the air.
+[Unit]
+Description=The frame's update
+ConditionPathExists=/etc/frame/update-url
+RequiresMountsFor=/android-data
+Wants=network-online.target
+After=network-online.target time-sync.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/frame-update

@@ -1,0 +1,29 @@
+# The two slots' state, said once: sourced by the system's scripts, and written into the
+# initramfs's /init (boot/initramfs.py). `state` is replaced whole: a new file, synced, renamed,
+# synced, so that a power cut leaves the old one or the new one. Keys: active, pending, tries, and
+# boots (of the active slot, without a proof that it works).
+slots=/android-data/frame/slots
+state=$slots/state
+key() { sed -n "s/^$1=//p" $state 2>/dev/null; }
+remember() { printf 'active=%s\npending=%s\ntries=%s\nboots=%s\n' "$1" "$2" "$3" "${4:-0}" >$state.new && sync && mv $state.new $state && sync; }
+other() { if [ "$1" = a ]; then echo b; else echo a; fi; }
+# A slot is what its manifest says (frame-seal): every file read through SHA-256 for an update on
+# trial and for a slot whose last boot proved nothing (`whole`); a slot that proved itself is
+# only looked at, each file there and of its size (`there`). `keys`: the release keys one of
+# which must have signed the manifest; the initramfs sets the ones it was built with, the system
+# asks none (what it offers, the initramfs judges at the next boot).
+keys=
+seal=/usr/local/bin/frame-seal
+[ -x $seal ] || seal=/bin/frame-seal
+whole() { $seal check --whole $slots/$1 $keys >/dev/null 2>&1; }
+there() { $seal check $slots/$1 $keys >/dev/null 2>&1; }
+# the command line U-Boot gave: this kernel's own without what it adds itself, nor the slot a
+# first kernel chose
+uboot_line() { sed "s/ *console=tty0 .*//; s/ *[a-z]*\.slot=[ab]//" /proc/cmdline; }
+# a frame that kept its slots under its first product's name: moved once, a link left for the
+# system that still looks there
+settle() {
+	[ ! -d $slots ] && [ -d /android-data/maison/slots ] && [ ! -L /android-data/maison/slots ] || return 0
+	mkdir -p /android-data/frame && chown 0:0 /android-data/frame && chmod 755 /android-data/frame &&
+		mv /android-data/maison/slots $slots && ln -s ../frame/slots /android-data/maison/slots && sync
+}

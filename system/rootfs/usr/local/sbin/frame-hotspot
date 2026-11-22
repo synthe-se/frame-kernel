@@ -1,0 +1,29 @@
+#!/bin/sh
+# The frame's own Wi-Fi, for a touch panel that no longer answers: `open` from the power key held
+# (frame-power-key), `close` from frame-wifi-watch, 30 minutes after the page's last request.
+# frame-wpa requires frame-wifi, a oneshot that has ended: it runs again first and reads
+# $hotspot. The product's unit reads FRAME_SETUP_* as it starts, from /run/frame-setup; the page
+# itself is the product's (frame-setup.service, if it ships one).
+set -eu
+hotspot=/run/frame-hotspot
+apply() {
+	systemctl restart frame-wpa
+	networkctl reload
+	systemctl restart "$(cat /etc/frame/unit)"
+}
+case "${1-}" in
+open)
+	[ ! -e "$hotspot" ] || exit 0
+	: >"$hotspot"
+	apply
+	;;
+close)
+	rm -f "$hotspot" /run/frame-setup /run/systemd/network/40-frame-setup.network
+	systemctl stop frame-setup 2>/dev/null || :
+	apply
+	;;
+*)
+	echo "usage: frame-hotspot open|close" >&2
+	exit 2
+	;;
+esac

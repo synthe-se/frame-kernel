@@ -1,0 +1,23 @@
+[package]
+name = "frame-seal"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+description = "What a slot of the frame may hold and whether it is whole: its manifest, signed by its product's release key, checked in the initramfs before anything is mounted, and by the system before a slot is offered"
+publish = false
+
+[dependencies]
+# the manifest's signature (Ed25519, verification only): no C, so that the initramfs's copy
+# builds static with nothing but the Rust toolchain
+ed25519-dalek = { version = "2", default-features = false }
+# the files' digests
+sha2 = { version = "0.10", default-features = false }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"

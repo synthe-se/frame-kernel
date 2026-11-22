@@ -1,0 +1,77 @@
+#!/bin/sh
+# What every boot must prove, for 45 s: the product's unit (/etc/frame/unit) running without a
+# restart, and drawing if it says so (/etc/frame/heartbeat names a file it touches). Then the system
+# counts as good: an update on trial is kept, the active slot's boots go back to zero. Else, after
+# 150 s, a restart: the initramfs counts it, and comes back to the slot before.
+set -eu
+. /usr/local/lib/frame-slots
+[ -s "$state" ] || exit 0
+
+unit=$(cat /etc/frame/unit)
+heartbeat=$(cat /etc/frame/heartbeat 2>/dev/null || :)
+pending=$(key pending)
+drawing() {
+	[ "$(systemctl is-active "$unit")" = active ] && [ "$(systemctl show -p NRestarts --value "$unit")" = 0 ] || return 1
+	[ -z "$heartbeat" ] || { [ -e "$heartbeat" ] && [ $(($(date +%s) - $(date -r "$heartbeat" +%s))) -lt 30 ]; }
+}
+# an update must be reachable to be kept (a frame that lost the Wi-Fi could never be updated
+# again); a system already proved only draws, or a router out of order would turn it into a loop
+healthy() {
+	drawing || return 1
+	[ -z "$pending" ] || { [ "$(systemctl is-active sshd)" = active ] && ip link show wlan0 | grep -q LOWER_UP; }
+}
+
+# What the next boot may take for granted of the network (frame-wifi): the access point's channel
+# and name, as wpa_supplicant said them, and the lease networkd holds, until it ends. A lease that
+# is not the one this boot guessed makes the guess go: the address was someone else's.
+learn() {
+	known=/android-data/frame/wifi.known
+	guess=/run/systemd/network/40-wlan0-known.network
+	lease=$(ls /run/systemd/netif/leases/* 2>/dev/null | head -1)
+	[ -s "$lease" ] || return 0
+	joined=$(journalctl -b -u frame-wpa -o cat | grep "Trying to associate" | tail -1)
+	ssid=$(printf '%s' "$joined" | sed -n "s/.*SSID='\\(.*\\)' freq=[0-9]* MHz.*/\\1/p")
+	freq=$(printf '%s' "$joined" | sed -n "s/.* freq=\\([0-9]*\\) MHz.*/\\1/p")
+	said() { sed -n "s/^$1=//p" "$lease" | head -1; }
+	# 255.255.255.0 as /24
+	bits=0
+	for byte in $(said NETMASK | tr . ' '); do
+		while [ "$byte" -gt 0 ]; do bits=$((bits + (byte & 1))); byte=$((byte >> 1)); done
+	done
+	# networkd's lifetime (`12h`, `1d 2h 30min`) in seconds
+	life=0
+	for part in $(said LIFETIME); do
+		case "$part" in
+		*d) life=$((life + ${part%d} * 86400)) ;;
+		*h) life=$((life + ${part%h} * 3600)) ;;
+		*min) life=$((life + ${part%min} * 60)) ;;
+		*s) life=$((life + ${part%s})) ;;
+		esac
+	done
+	address=$(said ADDRESS)/$bits
+	if [ -s "$guess" ] && ! grep -qx "Address=$address" "$guess"; then
+		rm -f "$guess"
+		networkctl reload
+	fi
+	[ -n "$ssid" ] && [ -n "$freq" ] && [ "$life" -gt 300 ] || return 0
+	printf 'ssid=%s\nfreq=%s\naddress=%s\nrouter=%s\ndns=%s\nuntil=%s\n' "$ssid" "$freq" "$address" "$(said ROUTER)" "$(said DNS)" $(($(date +%s) + life - 300)) >"$known.new" &&
+		mv "$known.new" "$known"
+}
+
+held=0 waited=0
+while [ "$waited" -lt 150 ]; do
+	if healthy; then held=$((held + 5)); else held=0; fi
+	if [ "$held" -ge 45 ]; then
+		frame-slot good
+		learn || :
+		# the boot is over: the processor's clock back to the governor (the initramfs held it at its fastest)
+		for g in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor; do echo schedutil >"$g"; done
+		kill "$(pidof frame-guard)" 2>/dev/null || true
+		echo "good: slot $(key active)${pending:+, an update kept}"
+		exit 0
+	fi
+	sleep 5
+	waited=$((waited + 5))
+done
+echo "not healthy after ${waited}s: restarting" >&2
+systemctl reboot

@@ -1,0 +1,7 @@
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+# <hostname>.local (resolved.conf.d/frame.conf)
+MulticastDNS=yes
