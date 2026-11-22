@@ -49,8 +49,8 @@ Measured on a cold start, from the kernel's first line, with a product that draw
 | the slot is chosen, its picture drawn, its system mounted | 2.2 s |
 | the Wi-Fi's driver is loaded (beside the boot) | 3.0 s |
 | the product's program starts | 4.6 s |
-| the Wi-Fi is associated | 6.9 s |
-| the frame has its address | 7.0 s |
+| the Wi-Fi is associated | 6.7 s |
+| the frame has its address | 7.3 s |
 
 U-Boot's own time, before the kernel, is not in these: the kernel's log does not see it.
 
