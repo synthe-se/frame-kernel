@@ -154,6 +154,11 @@ fn stage(agent: &ureq::Agent, base: &str, manifest: &Manifest, dir: &Path) -> Re
 fn seal(dir: &Path, manifest: &[u8], signature: &[u8]) -> Result<(), String> {
     fs::write(dir.join(MANIFEST), manifest).map_err(|e| e.to_string())?;
     fs::write(dir.join(SIGNATURE), signature).map_err(|e| e.to_string())?;
+    // sealed where the partition can (fs-verity): the trial then knows the slot whole at once.
+    // Where it cannot, the slot is read through as before.
+    if let Ok(read) = frame_seal::read(manifest) {
+        let _ = frame_seal::seal(dir, &read);
+    }
     Command::new("sync").status().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -263,6 +268,7 @@ mod tests {
         let manifest = Manifest {
             version: 9,
             files: vec![frame_tools::File {
+                verity: None,
                 name: "rootfs.squashfs".into(),
                 sha256: "00".repeat(32),
                 size: 3,

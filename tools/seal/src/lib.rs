@@ -1,12 +1,16 @@
 //! A slot's manifest: what it holds, each file by its name, its size and its SHA-256, and a
 //! version that only goes up; `manifest.json`, with its detached Ed25519 signature `manifest.sig`
 //! by the product's release key. The initramfs starts nothing whose manifest no key it trusts
-//! signed; the private key never leaves the build machine.
+//! signed; the private key never leaves the build machine. A file may also be named by its
+//! fs-verity digest: once sealed on the frame (`seal`), the kernel checks every block it reads of
+//! it, and asking its digest stands for reading it whole.
 
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::Path;
+
+pub mod verity;
 
 /// What a slot may hold, and nothing else: a name comes from the network and becomes a path. The
 /// system; perhaps a kernel of its own; the product's boot picture, which the initramfs draws.
@@ -36,6 +40,10 @@ pub struct File {
     pub name: String,
     pub sha256: String,
     pub size: u64,
+    /// Its fs-verity digest (SHA-256, 4096-byte blocks, no salt), in hex: what the kernel says
+    /// of the file once it is sealed. A manifest from before has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verity: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -93,6 +101,15 @@ pub fn read(bytes: &[u8]) -> Result<Manifest, Refused> {
         if unhex(&f.sha256).is_none_or(|h| h.len() != 32) {
             return Err(Refused::BadManifest(format!("{}: not a SHA-256", f.name)));
         }
+        if f.verity
+            .as_ref()
+            .is_some_and(|v| unhex(v).is_none_or(|h| h.len() != 32))
+        {
+            return Err(Refused::BadManifest(format!(
+                "{}: not an fs-verity digest",
+                f.name
+            )));
+        }
     }
     Ok(manifest)
 }
@@ -120,9 +137,11 @@ pub fn sha256_of(path: &Path) -> std::io::Result<String> {
 /// How far a slot's files are looked at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Depth {
-    /// Each file there, of the size the manifest says: a slot that proved itself at its last boot.
+    /// Each file there, of the size the manifest says: a slot that proved itself at its last
+    /// boot. A sealed file is asked its digest too: it costs nothing and says everything.
     Sizes,
-    /// Each file read through SHA-256: an update on trial, a slot whose last boot proved nothing.
+    /// Each file known whole: an update on trial, a slot whose last boot proved nothing. A sealed
+    /// file by its digest, at once; any other read through SHA-256.
     Whole,
 }
 
@@ -151,6 +170,18 @@ pub fn holds(dir: &Path, manifest: &Manifest, depth: Depth) -> Result<(), Refuse
                 format!("{} bytes for {}", there.len(), said.size),
             ));
         }
+        // sealed, the kernel answers for every block: its digest is the manifest's or the file
+        // is another, and nothing is left to read
+        let sealed = verity::measure(&path);
+        if let (Some(sealed), Some(said)) = (sealed, &said.verity) {
+            if hex(&sealed) != *said {
+                return Err(Refused::BadFile(
+                    name.into(),
+                    "another fs-verity digest".into(),
+                ));
+            }
+            continue;
+        }
         if depth == Depth::Whole {
             let sum = sha256_of(&path).map_err(|e| Refused::BadFile(name.into(), e.to_string()))?;
             if sum != said.sha256 {
@@ -159,6 +190,29 @@ pub fn holds(dir: &Path, manifest: &Manifest, depth: Depth) -> Result<(), Refuse
         }
     }
     Ok(())
+}
+
+/// Seals each file of the slot in `dir` its manifest names with a digest: from here the kernel
+/// checks what it reads of them, and `holds` knows them whole at once. A file whose digest, once
+/// sealed, is not the manifest's is said. How many are sealed.
+pub fn seal(dir: &Path, manifest: &Manifest) -> Result<usize, Refused> {
+    let mut sealed = 0;
+    for file in &manifest.files {
+        let Some(said) = &file.verity else { continue };
+        let path = dir.join(&file.name);
+        verity::enable(&path)
+            .map_err(|e| Refused::BadFile(file.name.clone(), format!("not sealed: {e}")))?;
+        match verity::measure(&path) {
+            Some(digest) if hex(&digest) == *said => sealed += 1,
+            _ => {
+                return Err(Refused::BadFile(
+                    file.name.clone(),
+                    "another fs-verity digest".into(),
+                ));
+            }
+        }
+    }
+    Ok(sealed)
 }
 
 fn limited(path: &Path) -> Result<Vec<u8>, Refused> {
@@ -227,6 +281,7 @@ mod tests {
                 name: name.into(),
                 sha256: sha.into(),
                 size: 1,
+                verity: None,
             }],
         })
         .unwrap()
@@ -275,6 +330,7 @@ mod tests {
                 name: (*name).into(),
                 sha256: sha256_of(&dir.join(name)).unwrap(),
                 size: std::fs::metadata(dir.join(name)).unwrap().len(),
+                verity: Some(hex(&verity::digest(&dir.join(name)).unwrap())),
             })
             .collect();
         Manifest { version: 1, files }
@@ -310,6 +366,14 @@ mod tests {
             matches!(holds(&dir, &manifest, Depth::Sizes), Err(Refused::BadFile(n, _)) if n == "splash.conf")
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_manifest_from_before_the_digests_still_reads_and_a_digest_is_32_bytes() {
+        let old = br#"{"version":3,"files":[{"name":"rootfs.squashfs","sha256":"abababababababababababababababababababababababababababababababab","size":1}]}"#;
+        assert_eq!(read(old).unwrap().files[0].verity, None);
+        let odd = br#"{"version":3,"files":[{"name":"rootfs.squashfs","sha256":"abababababababababababababababababababababababababababababababab","size":1,"verity":"abcd"}]}"#;
+        assert!(matches!(read(odd), Err(Refused::BadManifest(_))));
     }
 
     #[test]

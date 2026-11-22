@@ -8,9 +8,10 @@ state=$slots/state
 key() { sed -n "s/^$1=//p" "$state" 2>/dev/null; }
 remember() { printf 'active=%s\npending=%s\ntries=%s\nboots=%s\n' "$1" "$2" "$3" "${4:-0}" >"$state.new" && sync && mv "$state.new" "$state" && sync; }
 other() { if [ "$1" = a ]; then echo b; else echo a; fi; }
-# A slot is what its manifest says (frame-seal): every file read through SHA-256 for an update on
-# trial and for a slot whose last boot proved nothing (`whole`); a slot that proved itself is
-# only looked at, each file there and of its size (`there`). `keys`: the release keys one of
+# A slot is what its manifest says (frame-seal): every file known whole for an update on trial
+# and for a slot whose last boot proved nothing (`whole`); a slot that proved itself is only
+# looked at, each file there and of its size (`there`). A sealed file (fs-verity) is known whole
+# by asking the kernel its digest, at once; any other is read through SHA-256. `keys`: the release keys one of
 # which must have signed the manifest; the initramfs sets the ones it was built with, the system
 # asks none (what it offers, the initramfs judges at the next boot).
 keys=

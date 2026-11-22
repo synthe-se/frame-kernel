@@ -42,5 +42,7 @@ cat "$REPO/build/$NAME/version" >"$dir/version"
 # for a frame whose `boot` is from before the manifests: its sums
 (cd "$dir" && for f in rootfs.squashfs splash.raw splash.conf zImage board.dtb initramfs.cpio.gz; do [ ! -e "$f" ] || shasum -a 256 -- "$f"; done >sums)
 for f in "$dir"/*; do "$REPO/bin/send.sh" "$f" "$slots/$slot/$(basename "$f")"; done
+# sealed (fs-verity) where the system on the frame knows how: its trial then knows it whole at once
+c "/usr/local/bin/frame-seal seal $slots/$slot >/dev/null 2>&1 || echo \"slot $slot is not sealed: read through at its trial\"" 60
 c "$tool offer $slot" 60
 echo "$NAME $(cat "$REPO/build/$NAME/version"): slot $slot, tried at the next boot"

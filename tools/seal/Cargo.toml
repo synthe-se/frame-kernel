@@ -10,6 +10,8 @@ publish = false
 # the manifest's signature (Ed25519, verification only): no C, so that the initramfs's copy
 # builds static with nothing but the Rust toolchain
 ed25519-dalek = { version = "2", default-features = false }
+# fs-verity's two calls (enable, measure), which nothing safe covers
+libc = "0.2"
 # the files' digests
 sha2 = { version = "0.10", default-features = false }
 serde = { version = "1.0.229", features = ["derive"] }

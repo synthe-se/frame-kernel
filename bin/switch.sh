@@ -42,6 +42,7 @@ rm -rf $slots/$free
 mkdir -p $slots/$free
 cp $parked/$target/* $slots/$free/
 sync
+/usr/local/bin/frame-seal seal $slots/$free >/dev/null 2>&1 || :
 $tool offer $free
 echo \"$running parked, $target in slot $free\"" 180
 exec "$REPO/bin/try.sh" --settle

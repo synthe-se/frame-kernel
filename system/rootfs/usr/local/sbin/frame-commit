@@ -65,6 +65,9 @@ while [ "$waited" -lt 150 ]; do
 	if healthy; then held=$((held + 5)); else held=0; fi
 	if [ "$held" -ge 45 ]; then
 		frame-slot good
+		# the slot that proved itself, sealed if it is not yet (fs-verity): the kernel answers for
+		# every block read of it from here, and the next boots know it whole at once
+		"$seal" seal "$slots/$(key active)" >/dev/null 2>&1 || :
 		learn || :
 		# the boot is over: the processor's clock back to the governor (the initramfs held it at its fastest)
 		for g in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor; do echo schedutil >"$g"; done

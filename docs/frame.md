@@ -60,10 +60,11 @@ U-Boot's own time, before the kernel, is not in these: the kernel's log does not
 What it took, each a wait found and removed (the same frame took 15.5 s to start its product
 before them, 16 s to an address):
 
-- A slot's files were read through SHA-256 at every boot: 4.6 s for 28 MB on this processor. A
-  slot that proved itself at its last boot is only looked at (each file there, of its size, under
-  a manifest its product's key signed); it is read whole when it is on trial or when the last
-  boot proved nothing.
+- A slot's files were read through SHA-256 at every boot: 4.6 s for 28 MB on this processor.
+  They are sealed (fs-verity): the kernel checks each block as it is read, and the initramfs
+  asks each file its digest, which the signed manifest names. 50 ms for a slot, cold, whether it
+  proved itself at its last boot, is on trial or was cut short: the system is mounted 0.6 s
+  after the initramfs starts in every case.
 - The initramfs waited by the second (`sleep 1`) for the eMMC, the framebuffer, the display and
   the Wi-Fi's interface: it asks every 50 ms.
 - It waited for the Wi-Fi's driver before it started the system. The driver loads beside the
@@ -98,8 +99,14 @@ and perhaps a kernel, its device tree and its initramfs. `boot` is written by no
 by `bin/try.sh --flash`: its kernel is what any failure comes back to. `state` says `active`,
 `pending`, `tries` and `boots`.
 
-A slot is sealed (`tools/seal`, `frame-seal`): `manifest.json` names each file, its size and its
-SHA-256, and `manifest.sig` is its Ed25519 signature by the product's release key. The initramfs
+A slot is sealed (`tools/seal`, `frame-seal`): `manifest.json` names each file, its size, its
+SHA-256 and its fs-verity digest (computed on the build machine as the kernel computes it:
+SHA-256, 4096-byte blocks, no salt), and `manifest.sig` is its Ed25519 signature by the
+product's release key. On the frame each file is sealed once it is whole (at its install, its
+update, or when its slot proves itself): from there the kernel refuses any write to it and
+answers for every block read; a file whose digest is not the manifest's is another file. A
+file not sealed (a partition without fs-verity) is read through SHA-256 instead, when the slot
+is on trial or its last boot proved nothing. The initramfs
 holds the public halves of the keys it was built with (`just boot <products>`) and starts nothing
 no key signed: seen on the frame, a slot whose signature was altered is refused and the other
 one starts. The private key never leaves the build machine (`$FRAME_HOME/keys/<product>.pk8`);

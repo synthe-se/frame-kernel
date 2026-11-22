@@ -80,7 +80,8 @@ is, `frame-loader` to stop when it draws its first picture, and the acceleromete
 U-Boot (the vendor's) draws a picture and starts the kernel in `boot`, which holds its
 initramfs. Its `/init` mounts the data partition, where two slots, `a` and `b`, each hold a system (a
 squashfs), its boot picture, and perhaps a kernel of its own; it draws the slot's picture,
-chooses the slot (an update on trial, a system that failed four boots, a slot not whole), and
+chooses the slot (an update on trial, a system that failed four boots, a slot not whole or not
+signed by its product's key: each file is sealed, fs-verity, and known by its digest), and
 starts it under a tmpfs: the system runs from RAM and never writes to itself. `frame-commit`
 then proves the boot or restarts the frame, and the initramfs comes back to the slot before.
 No update writes `boot`: its kernel is what any failure comes back to.

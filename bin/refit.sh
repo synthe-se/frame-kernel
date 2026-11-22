@@ -194,7 +194,7 @@ go)
 	c "chown 0:0 /mnt /mnt/frame && chmod 755 /mnt /mnt/frame && mkdir -p /mnt/frame/slots/a && chmod 700 /mnt/frame/slots" 20
 	step "the slot"
 	for f in "$WORK/slot"/*; do "$REPO/bin/send.sh" "$f" "/mnt/frame/slots/a/$(basename "$f")" >/dev/null; done
-	c "printf 'active=a\npending=\ntries=0\nboots=1\n' >/mnt/frame/slots/state && /usr/local/bin/frame-seal check --whole /mnt/frame/slots/a >/dev/null && sync && ls /mnt /mnt/frame /mnt/frame/slots/a | tr '\n' ' ' && umount /mnt && sync && echo && echo laid" 120 | tail -2
+	c "printf 'active=a\npending=\ntries=0\nboots=1\n' >/mnt/frame/slots/state && /usr/local/bin/frame-seal check --whole /mnt/frame/slots/a >/dev/null && /usr/local/bin/frame-seal seal /mnt/frame/slots/a >/dev/null && sync && ls /mnt /mnt/frame /mnt/frame/slots/a | tr '\n' ' ' && umount /mnt && sync && echo && echo laid" 120 | tail -2
 	before=$(boot_id)
 	step "restarting cold, on the new boot and the new partition"
 	c 'systemctl reboot' 10 || true

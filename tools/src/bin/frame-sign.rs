@@ -68,6 +68,9 @@ fn describe(version: &str, dir: &Path) -> Result<(), String> {
                 name: name.into(),
                 sha256: sha256_of(&path).map_err(|e| e.to_string())?,
                 size,
+                verity: Some(hex(
+                    &frame_seal::verity::digest(&path).map_err(|e| e.to_string())?
+                )),
             });
         }
     }
