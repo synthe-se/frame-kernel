@@ -9,7 +9,7 @@ if [ -b "$device" ]; then
 	sectors=$(cat "/sys/class/block/${device#/dev/}/size")
 	held=$(df -k /data | awk 'NR == 2 { print $2 }')
 	# a filesystem under nine tenths of its partition was made for a smaller one
-	[ "$held" -ge $((sectors / 2 * 9 / 10)) ] || resize2fs "$device" >/dev/null 2>&1 || echo "frame-data: $device could not be grown" >&2
+	[ "$held" -ge $((sectors * 9 / 20)) ] || resize2fs "$device" >/dev/null 2>&1 || echo "frame-data: $device could not be grown" >&2
 fi
 install -d -o root -g root -m 0755 "$keep"
 install -d -o systemd-timesync -g systemd-timesync -m 0755 "$keep/timesync"
