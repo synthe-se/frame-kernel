@@ -8,10 +8,12 @@ times (a sign with no console at all, ~10 s) and waits 8 s before saying what ca
 boot/tools.sh's static ones; the touch firmware extracted from the vendor kernel
 ($FRAME_HOME/recon, never in the repo).
 
-    python3 boot/initramfs.py [--debug] [--key <release.pub>]… <tools dir> <touch firmware> <out.cpio | out.cpio.gz>
+    python3 boot/initramfs.py [--debug] [--key <release.pub>]… [--payload <directory>] <tools dir> <touch firmware> <out.cpio | out.cpio.gz>
 
 Each --key is a product's release key (its public half): a slot starts only if one of them signed
 its manifest. Without any, a bring-up image, the manifests' signatures are not asked.
+--payload makes a maintenance start (boot/payload.py): the directory goes in the same archive,
+under /payload, and the system it holds is the one started, from RAM.
 """
 
 import gzip
@@ -20,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bootimg  # noqa: E402
+import payload as carried  # noqa: E402
 import splash  # noqa: E402
 
 FIRMWARE = "lib/firmware/silead/gsl-amaboo-gbzk-y1000.fw"  # the DT's firmware-name
@@ -268,8 +271,22 @@ if [ -n "$slot" ] && loop=$(losetup -f) && losetup -r $loop $img && mount -t squ
 fi
 say "no system: slot $slot"
 # a maintenance start that could not start its system says why where the tools read it back
-# (bin/refit.sh): 4096 sectors into the partition it was to make anew, which holds nothing kept
-[ -z "$payload" ] || {{ set +x; {{ echo "frame-maintenance-log"; dmesg | tail -n 60; cat /tmp/trace; }} | dd of=/dev/mmcblk0 bs=512 seek=122880 conv=notrunc 2>/dev/null; sync; }}
+# (bin/refit.sh): in the partition's own filesystem when it has one (a frame already refitted,
+# tried again), else 4096 sectors into the partition it was to make, which holds nothing kept
+if [ -n "$payload" ]; then
+	set +x
+	{{ echo "frame-maintenance-log"; dmesg | tail -n 60; cat /tmp/trace; }} >/tmp/log 2>/dev/null
+	part=$(grep -l "^PARTNAME=data$" /sys/class/block/*/uevent | head -1)
+	device=/dev/$(grep "^DEVNAME=" $part | cut -d= -f2)
+	umount /data 2>/dev/null
+	if mount -t ext4 -o rw,noatime $device /data 2>/dev/null; then
+		mkdir -p /data/frame && cp /tmp/log /data/frame/maintenance.log
+		umount /data
+	else
+		dd if=/tmp/log of=$device bs=512 seek=4096 conv=notrunc 2>/dev/null
+	fi
+	sync
+fi
 # what cannot even start spends its count here, so that the next boot chooses again
 [ -z "$slot" ] || reboot -f
 pkill frame-loader
@@ -294,7 +311,7 @@ def init(debug: bool) -> str:
     )
 
 
-def build(tools: Path, firmware: Path, debug: bool = False, keys: tuple[Path, ...] = ()) -> bytes:
+def build(tools: Path, firmware: Path, debug: bool = False, keys: tuple[Path, ...] = (), payload: Path | None = None) -> bytes:
     entries, ino = [], [300000]
 
     def add(name, data=b"", mode=0o100644):
@@ -330,6 +347,8 @@ def build(tools: Path, firmware: Path, debug: bool = False, keys: tuple[Path, ..
         add(f"lib/modules/{ko}", (AIC8800 / ko).read_bytes())
     for f in sorted((AIC8800 / "firmware").iterdir()):
         add(f"{AIC8800_FIRMWARE}/{f.name}", f.read_bytes())
+    if payload:
+        entries += carried.entries(payload)
     return bootimg.write_cpio(entries)
 
 
@@ -337,9 +356,12 @@ def main() -> int:
     args = sys.argv[1:]
     debug = args[:1] == ["--debug"]
     args = args[1:] if debug else args
-    keys = []
-    while args[:1] == ["--key"] and len(args) > 1:
-        keys.append(Path(args[1]))
+    keys, payload = [], None
+    while args[:1] in (["--key"], ["--payload"]) and len(args) > 1:
+        if args[0] == "--key":
+            keys.append(Path(args[1]))
+        else:
+            payload = Path(args[1])
         args = args[2:]
     if len(args) != 3:
         print(__doc__, file=sys.stderr)
@@ -347,7 +369,7 @@ def main() -> int:
     out = Path(args[2])
     # in the kernel it goes as it is (the zImage's compression is the only one undone at boot); a
     # slot's own, which kexec loads, is gzip's
-    cpio = build(Path(args[0]), Path(args[1]), debug, tuple(keys))
+    cpio = build(Path(args[0]), Path(args[1]), debug, tuple(keys), payload)
     out.write_bytes(gzip.compress(cpio, compresslevel=9, mtime=0) if out.suffix == ".gz" else cpio)
     print(f"{out}: {out.stat().st_size} bytes")
     return 0

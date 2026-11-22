@@ -43,8 +43,8 @@ highmem.
 
 ## How it starts, and how long it takes
 
-Measured on a cold start, from the kernel's first line, with a product that draws straight on the panel
-(a slot that proved itself at its last boot):
+Measured on a cold start, from the kernel's first line, with a product that draws straight on
+the panel:
 
 | | |
 |---|---|
@@ -141,8 +141,11 @@ all (`bin/frame-state.sh`), an answer that did not come is never an empty answer
 `bin/refit.sh <product> prepare | dry | probe | go` turns a frame laid out by its vendor for
 Android into the frame's own: one ext4 partition after `boot` (with fs-verity), and the `boot`
 that knows it. It runs from a maintenance start: the product's system from RAM, started by kexec
-with what it needs to be reached (the Wi-Fi's network, the SSH host key) carried beside the
-initramfs, the eMMC unmounted. `boot` is written and read back, the partition made, what the
+with what it needs to be reached (the Wi-Fi's network, the SSH host key) carried in the
+initramfs's own archive, the eMMC unmounted. One archive, never two end to end: after a
+compressed archive the kernel does not always find the start of the one that follows
+(« invalid magic at start of compressed archive »), with some builds of the initramfs and not
+others: five maintenance starts of five failed that way, and four of four pass in one archive. `boot` is written and read back, the partition made, what the
 frame kept put back (read from it first: a frame that had its Wi-Fi from Android's own file
 would have come back mute), the slot laid and checked, then a cold start. Nothing before `boot`
 is ever written: the tools refuse the sector. Between the partition's making and the restart the

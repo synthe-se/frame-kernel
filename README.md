@@ -6,8 +6,8 @@ device tree, its Wi-Fi driver, its initramfs, its Buildroot system, its updates,
 that build, try, install and flash them.
 
 The board's repository, and no product's: it names none. What runs on the frame is a product,
-kept in its own repository and given here by its path: Maison's wall screen
-(`synthe-se/maison`) is one.
+kept in its own repository and given here by its path; Maison's wall screen (`synthe-se/maison`,
+its `frame/product`) is one.
 
 ## The recipes
 

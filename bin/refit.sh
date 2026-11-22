@@ -5,7 +5,8 @@
 # its picture) is never written: the reset pinhole stays the way back, whatever happens here.
 # In stages, each said and checked:
 #   prepare   what the frame must keep is read from it (its Wi-Fi's network, its SSH host key,
-#             its clock, the products' own files), and what the refit writes is made: the slot
+#             its clock, and the products' own directories: FRAME_KEEP="<names>" for more
+#             than this product's), and what the refit writes is made: the slot
 #             (signed), the maintenance start (the product's system in RAM), a small image of the
 #             partition for the loader, should the frame be left with nothing to start
 #   dry       the maintenance start, by kexec, and everything `go` needs looked at: nothing written
@@ -80,7 +81,8 @@ prepare)
 	mkdir -p "$WORK/keep" "$WORK/payload/data/frame" "$WORK/slot"
 	step "reading what the frame keeps"
 	root=$(c '[ -d /android-data ] && echo /android-data || echo /data' 20)
-	kept=$(c "cd $root && for f in frame/ssh frame/timesync frame/wifi.known frame/wifi.conf maison/target maison/edge maison/ui; do [ ! -e \$f ] || echo \$f; done" 20)
+	# the frame's own, and each product's directory (FRAME_KEEP: names there, this product's by default)
+	kept=$(c "cd $root && for f in frame/ssh frame/timesync frame/wifi.known frame/wifi.conf ${FRAME_KEEP:-$NAME}; do [ ! -e \$f ] || echo \$f; done" 20)
 	[ -n "$kept" ] || stop "the frame says it keeps nothing"
 	# shellcheck disable=SC2086  # one word a path
 	frame_ssh "tar cf - -C $root $(printf '%s ' $kept)" >"$WORK/keep.tar"
@@ -112,8 +114,9 @@ prepare)
 	cp "$WORK/wifi.conf" "$WORK/payload/data/frame/wifi.conf"
 	cp -R "$WORK/keep/frame/ssh" "$WORK/payload/data/frame/ssh"
 	[ ! -s "$WORK/keep/frame/wifi.known" ] || cp "$WORK/keep/frame/wifi.known" "$WORK/payload/data/frame/"
-	python3 -I "$REPO/boot/payload.py" "$WORK/payload" "$WORK/payload.cpio"
-	cat "$REPO/build/initramfs.cpio.gz" "$WORK/payload.cpio" >"$WORK/maintenance.initrd"
+	# one archive, as it is: the initramfs and what it carries (boot/payload.py says why not two)
+	python3 -I "$REPO/boot/initramfs.py" --payload "$WORK/payload" "$REPO/build/tools" "$FRAME_HOME/recon/gslX680.fw" "$WORK/maintenance.cpio"
+	mv "$WORK/maintenance.cpio" "$WORK/maintenance.initrd"
 
 	step "the partition's image for the loader, should it come to that"
 	mkdir -p "$WORK/dataroot/frame/slots/a"
@@ -135,9 +138,16 @@ dry)
 		step "sending $f"
 		"$REPO/bin/send.sh" "$REPO/build/$f" "/tmp/refit-$(basename "$f")" >/dev/null
 	done
-	# where a maintenance start that fails says why: emptied first, so that what is read is its own
-	c "dd if=/dev/zero of=/tmp/refit-zero bs=512 count=256 2>/dev/null" 20
-	write_at /tmp/refit-zero $((DATA + 4096)) 256 >/dev/null
+	# where a maintenance start that fails says why (boot/initramfs.py): a file of the partition's
+	# filesystem on a frame already refitted; else a place in the partition to be made, emptied
+	# first so that what is read there is its own
+	refitted=$(c "grep -q '^/dev/mmcblk0p1 /data ext4' /proc/mounts && echo yes || echo no" 20)
+	if [ "$refitted" = yes ]; then
+		c 'rm -f /data/frame/maintenance.log; sync' 20
+	else
+		c "dd if=/dev/zero of=/tmp/refit-zero bs=512 count=256 2>/dev/null" 20
+		write_at /tmp/refit-zero $((DATA + 4096)) 256 >/dev/null
+	fi
 	before=$(boot_id)
 	step "the maintenance start"
 	c 'for lib in /usr/local/lib/frame-slots /usr/local/lib/maison-slots; do [ ! -e $lib ] || { . $lib; break; }; done
@@ -145,7 +155,7 @@ kexec -l /tmp/refit-zImage --dtb=/tmp/refit-rk3126-amaboo-gbzk-y1000.dtb --initr
 	wait_for "the frame in its maintenance start" 180 restarted
 	if ! maintenance; then
 		# what the maintenance start left, where it says why (boot/initramfs.py)
-		c "dd if=/dev/mmcblk0 bs=512 skip=$((DATA + 4096)) count=256 2>/dev/null | tr -d '\\000' | grep -a -A400 '^frame-maintenance-log' | tail -n 70" 30 || true
+		c "{ cat /data/frame/maintenance.log 2>/dev/null || dd if=/dev/mmcblk0 bs=512 skip=$((DATA + 4096)) count=256 2>/dev/null | tr -d '\\000'; } | grep -a -A400 '^frame-maintenance-log' | tail -n 70" 30 || true
 		stop "the frame came back on its own system, not the maintenance start"
 	fi
 	step "looked at, nothing written:"
