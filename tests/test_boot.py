@@ -37,11 +37,11 @@ class Text(unittest.TestCase):
         for debug in (False, True):
             subprocess.run(["sh", "-n"], input=initramfs.init(debug).encode(), check=True)
 
-    def test_it_names_no_product(self):
+    def test_it_names_no_product_and_nothing_of_android(self):
         for debug in (False, True):
-            boot = initramfs.init(debug)
-            # the one mention: where a frame's first product kept the slots, to bring them over
-            self.assertEqual(set(re.findall(r"\S*maison\S*", boot)) - {"/android-data/maison/slots", "/android-data/maison/journal;"}, set())
+            boot = initramfs.init(debug).lower()
+            for word in ("maison", "android", "userdata"):
+                self.assertNotIn(word, boot)
 
     def test_no_root_console_and_no_blink_but_in_a_bring_up_image(self):
         boot, debug = initramfs.init(False), initramfs.init(True)
@@ -69,25 +69,25 @@ class Text(unittest.TestCase):
     def test_a_kernel_of_its_own_starts_armed_with_userdata_let_go(self):
         boot = initramfs.init(False)
         self.assertLess(boot.index("frame-guard arm"), boot.index("kexec -l"))
-        self.assertLess(boot.index("umount /android-data"), boot.index("kexec -e"))
+        self.assertLess(boot.index("umount /data"), boot.index("kexec -e"))
         self.assertLess(boot.index("kexec -l"), boot.index("wifi &"))
         self.assertLess(boot.index("frame-guard 240"), boot.index("exec switch_root"))
 
 
 class Boot(unittest.TestCase):
-    PATHS = ("sys", "proc", "dev", "android-data", "lower", "rw", "newroot", "tmp", "splash", "lib", "kept")
+    PATHS = ("sys", "proc", "dev", "data", "lower", "rw", "newroot", "tmp", "splash", "lib", "kept", "payload")
     PROVED = "active=a\npending=\ntries=0\nboots=0\n"
     UNPROVED = "active=a\npending=\ntries=0\nboots=1\n"
     TRIAL = "active=a\npending=b\ntries=2\nboots=0\n"
 
-    def boot(self, state, kernels="", broken="", missing="", at="frame", pictures="", cmdline="root=x console=tty0 y", keys=None):
+    def boot(self, state, kernels="", broken="", missing="", pictures="", payload=False, cmdline="root=x console=tty0 y", keys=None):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
         root = self.root = Path(d.name)
         (root / "log").touch()
         for name in self.PATHS:
             (root / name).mkdir()
-        slots = root / f"android-data/{at}/slots"
+        slots = root / "data/frame/slots"
         for slot in "ab":
             (slots / slot).mkdir(parents=True)
             if slot not in missing:
@@ -102,10 +102,14 @@ class Boot(unittest.TestCase):
         if state is not None:
             (slots / "state").write_text(state)
         (root / "sys/class/block/p").mkdir(parents=True)
-        (root / "sys/class/block/p/uevent").write_text("PARTNAME=userdata\nDEVNAME=p\n")
+        (root / "sys/class/block/p/uevent").write_text("PARTNAME=data\nDEVNAME=p\n")
         (root / "proc/cmdline").write_text(cmdline + "\n")
         (root / "newroot/etc/systemd/system").mkdir(parents=True)
         (root / "newroot/lib").mkdir()
+        if payload:
+            (root / "payload/data/frame").mkdir(parents=True)
+            (root / "payload/rootfs.squashfs").write_text("s")
+            (root / "payload/data/frame/wifi.conf").write_text("network={}\n")
         if keys:
             __import__("shutil").copytree(keys, root / "keys")
         (root / "lib/modules").mkdir()
@@ -156,7 +160,7 @@ class Boot(unittest.TestCase):
             if "ifconfig" in (root / "log").read_text() or "wifi &" not in text or not any(l.startswith("insmod") for l in (root / "log").read_text().splitlines()):
                 break
             time.sleep(0.1)
-        kept = root / "android-data/frame/slots/state"
+        kept = root / "data/frame/slots/state"
         return (root / "log").read_text().splitlines(), kept.read_text() if kept.exists() else None
 
     @staticmethod
@@ -211,7 +215,7 @@ class Boot(unittest.TestCase):
         log, state = self.boot(self.TRIAL, broken="b")
         self.assertEqual(self.started(log), ["a"])
         self.assertEqual(state, "active=a\npending=\ntries=0\nboots=1\n")
-        self.assertEqual((self.root / "android-data/frame/slots/failed").read_text(), "b\n")
+        self.assertEqual((self.root / "data/frame/slots/failed").read_text(), "b\n")
 
     def test_a_try_out_of_tries_goes_back(self):
         log, state = self.boot("active=a\npending=b\ntries=0\nboots=0\n")
@@ -258,13 +262,16 @@ class Boot(unittest.TestCase):
             # the first kernel counted the boot: nothing is counted twice
             self.assertEqual(state, self.PROVED)
 
-    def test_slots_kept_under_the_first_products_name_are_brought_over_once(self):
-        log, state = self.boot(self.PROVED, at="maison")
-        self.assertEqual(self.started(log), ["a"])
-        self.assertIn("boots=1", state)
-        old = self.root / "android-data/maison/slots"
-        self.assertTrue(old.is_symlink())
-        self.assertEqual((old / "state").read_text(), state)
+    def test_a_maintenance_start_runs_the_system_that_came_with_it_and_leaves_the_partition_alone(self):
+        log, state = self.boot(self.PROVED, payload=True)
+        self.assertFalse([line for line in log if "ext4" in line or line.startswith("e2fsck")], "the partition is not looked at")
+        self.assertEqual(state, self.PROVED, "nor its slots counted")
+        self.assertEqual([line.split("/")[-1] for line in log if line.startswith("losetup")], ["rootfs.squashfs"])
+        self.assertIn(f"losetup -r loop {self.root}/kept/rootfs.squashfs", log)
+        # what it needs to be reached came with it
+        self.assertEqual((self.root / "data/frame/wifi.conf").read_text(), "network={}\n")
+        self.assertTrue(any(line.startswith("switch_root") for line in log))
+        self.assertEqual(len([line for line in log if line.startswith("insmod")]), 2)
 
     def test_the_picture_is_the_slots_own_and_the_frames_for_want_of_one(self):
         log, _ = self.boot(self.PROVED, pictures="a")

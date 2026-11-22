@@ -1,8 +1,7 @@
 #!/bin/sh
-# What wpa_supplicant reads (frame-wpa.service) (/etc and /run are tmpfs: rebuilt at every boot, never written to
-# the eMMC). The network the frame joined, else the ones Android knows, with only the keys both
-# supplicants read the same way; none: wpa_supplicant still runs, for the product to scan
-# (frame-wifid). Only frame-hotspot makes the frame its own Wi-Fi: named after the product and
+# What wpa_supplicant reads (frame-wpa.service; /etc and /run are tmpfs: rebuilt at every boot,
+# never written to the eMMC). The network the frame joined ($own: frame-wifid or a product's setup
+# page wrote it); none: wpa_supplicant still runs, for the product to scan (frame-wifid). Only frame-hotspot makes the frame its own Wi-Fi: named after the product and
 # locked from its eMMC's serial, what the product shows, the last resort of a dead touch panel.
 # What the last boot learnt of the network ($known, frame-commit's) is taken for granted while it
 # may be: the channel its access point was on is the only one scanned (a second and a half less),
@@ -10,30 +9,16 @@
 # DHCP asks again beside it (two seconds less). Both are a guess: frame-wpa widens the scan when
 # nothing answers there, frame-commit forgets a lease the network no longer gives.
 set -eu
-own=/android-data/frame/wifi.conf
-android=/android-data/misc/wifi/wpa_supplicant.conf
+own=/data/frame/wifi.conf
 out=/etc/wpa_supplicant/wpa_supplicant-wlan0.conf
 hotspot=/run/frame-hotspot
-known=/android-data/frame/wifi.known
+known=/data/frame/wifi.known
 wide=/run/frame-wifi-wide
 guess=/run/systemd/network/40-wlan0-known.network
 umask 077
 mkdir -p /etc/wpa_supplicant
 
-networks() {
-	if [ -s "$own" ]; then
-		cat "$own"
-	elif [ -s "$android" ]; then
-		awk '
-			/^network=\{/ { inside = 1; print; next }
-			inside && /^\}/ { inside = 0; print; next }
-			inside {
-				key = $0; sub(/^[ \t]*/, "", key); sub(/=.*/, "", key)
-				if (key ~ /^(ssid|psk|key_mgmt|priority|scan_ssid|proto|pairwise|group|ieee80211w)$/) print
-			}
-		' "$android"
-	fi
-}
+networks() { [ ! -s "$own" ] || cat "$own"; }
 
 said() { sed -n "s/^$1=//p" "$known" 2>/dev/null | head -1; }
 rm -f "$guess"

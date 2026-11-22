@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A frame shared by two products: the one that runs is put aside whole (/android-data/frame/parked/
+# A frame shared by two products: the one that runs is put aside whole (/data/frame/parked/
 # <product>: its system, its boot picture, their sums checked), the other comes back from there
 # into the free slot, on trial as any update, and the frame restarts on it. The free slot is any
 # install's to overwrite: what a product must keep while the other runs is its parked copy.
@@ -9,7 +9,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 c() { "$REPO/bin/console.sh" "$@"; }
 . "$REPO/bin/frame-state.sh"
-parked=/android-data/frame/parked
+parked=/data/frame/parked
 if [ $# = 0 ]; then
 	frame_slots || { echo "the frame does not say what its slots hold" >&2; exit 1; }
 	echo "runs: $running (slot $mounted${pending:+, on trial})"

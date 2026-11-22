@@ -24,7 +24,7 @@ slot=$([ "$active" = a ] && echo b || echo a)
 # a frame two products share: the free slot is this install's to overwrite, so the product that
 # runs, when it is another one, is put aside whole first (switch.sh brings it back)
 if [ "$running" != "$NAME" ]; then
-	parked=/android-data/frame/parked
+	parked=/data/frame/parked
 	c "set -e; rm -rf $parked/$running.new; mkdir -p $parked/$running.new; cp $slots/$active/* $parked/$running.new/; /usr/local/bin/frame-seal check --whole $parked/$running.new >/dev/null; rm -rf $parked/$running; mv $parked/$running.new $parked/$running; sync; echo \"$running put aside\"" 180
 fi
 c "rm -rf $slots/$slot; mkdir -p $slots/$slot; sync" 20

@@ -26,7 +26,7 @@ healthy() {
 # and name, as wpa_supplicant said them, and the lease networkd holds, until it ends. A lease that
 # is not the one this boot guessed makes the guess go: the address was someone else's.
 learn() {
-	known=/android-data/frame/wifi.known
+	known=/data/frame/wifi.known
 	guess=/run/systemd/network/40-wlan0-known.network
 	lease=
 	for held in /run/systemd/netif/leases/*; do [ ! -s "$held" ] || { lease=$held; break; }; done

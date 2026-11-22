@@ -15,7 +15,7 @@ frame_ready() {
 	fi
 }
 frame_options=(-o BatchMode=yes -o ConnectTimeout=5 -o ConnectionAttempts=3 -o HostKeyAlias=frame -o StrictHostKeyChecking=accept-new -o "CertificateFile=$frame_cert")
-frame_answers() { ssh "${frame_options[@]}" -o ConnectTimeout=3 "root@$1" true 2>/dev/null; }
+frame_answers() { ssh -n "${frame_options[@]}" -o ConnectTimeout=3 "root@$1" true 2>/dev/null; }
 # sets FRAME; fails when no frame answers
 frame_find() {
 	frame_ready

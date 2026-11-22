@@ -57,6 +57,10 @@ try:
 flash:
     bin/try.sh --flash
 
+# A frame laid out for Android becomes the frame's own (docs/frame.md « A frame refitted »): prepare, dry, probe, go.
+refit product stage:
+    bin/refit.sh "{{product}}" {{stage}}
+
 # A command on the frame, as root.
 on +command:
     bin/console.sh "{{command}}"

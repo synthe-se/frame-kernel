@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC2153,SC2154  # what the product says of itself comes from /product.env
 # What the overlay cannot say: the product (its files, its name, its units), the frame's tools, who
-# may come in, the journal kept on userdata, the names OpenSSH uses, the units enabled. $1 is the
+# may come in, the journal kept on the data partition, the names OpenSSH uses, the units enabled. $1 is the
 # target's root; bin/system.sh leaves what it built in /tmp, the product's files in /staging and
 # what it says of itself in /product.env, and mounts the CA's public key.
 set -eu
@@ -52,10 +52,10 @@ ln -sf ../run/systemd/resolve/stub-resolv.conf "$root/etc/resolv.conf"
 sed -i '/kernel.sysrq/d' "$root/usr/lib/sysctl.d/50-default.conf"
 # systemd already starts dbus-daemon as its user: asked again, it fails to drop groups and warns
 sed -i '/<user>dbus<\/user>/d' "$root/usr/share/dbus-1/system.conf"
-# the journal on userdata, kept across power cuts (frame-data makes the directory)
+# the journal on the data partition, kept across power cuts (frame-data makes the directory)
 mkdir -p "$root/var/log"
 rm -rf "$root/var/log/journal"
-ln -s /android-data/frame/journal "$root/var/log/journal"
+ln -s /data/frame/journal "$root/var/log/journal"
 ln -sf /dev/null "$root/etc/tmpfiles.d/journal-nocow.conf"
 # OpenSSH's own unit and configuration: ours in a drop-in, the host keys made on the frame
 rm -rf "$root/etc/systemd/system/sshd.service.d"
@@ -100,5 +100,5 @@ disable serial-getty@.service
 disable remote-fs.target
 PRESET
 } >"$root/usr/lib/systemd/system-preset/10-frame.preset"
-# the clock's floor without its file on userdata: never before this image was made
+# the clock's floor without its file on the data partition: never before this image was made
 touch "$root/usr/lib/clock-epoch"

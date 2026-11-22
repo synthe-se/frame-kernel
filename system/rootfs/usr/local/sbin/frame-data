@@ -1,20 +1,20 @@
 #!/bin/sh
-# What the frame keeps on userdata (frame-data.service), under /android-data/frame: the slots, the
-# clock, the journal, the SSH host key, the Wi-Fi it joined. A frame that kept them under its first
-# product's name has them brought over once.
+# What the frame keeps on its data partition (frame-data.service), under /data/frame: the slots,
+# the clock, the journal, the SSH host key, the Wi-Fi it joined. And the partition itself at its
+# full size: a frame's first image is smaller than its eMMC, grown here once, mounted.
 set -eu
-# shellcheck source=system/rootfs/usr/local/lib/frame-slots
-. /usr/local/lib/frame-slots
-old=/android-data/maison
-new=/android-data/frame
-settle
-install -d -o root -g root -m 0755 "$new"
-for kept in wifi.conf ssh timesync; do
-	[ -e "$new/$kept" ] || [ ! -e "$old/$kept" ] || cp -a "$old/$kept" "$new/$kept"
-done
-install -d -o systemd-timesync -g systemd-timesync -m 0755 "$new/timesync"
+keep=/data/frame
+device=$(awk '$2 == "/data" { print $1 }' /proc/mounts | head -1)
+if [ -b "$device" ]; then
+	sectors=$(cat "/sys/class/block/${device#/dev/}/size")
+	held=$(df -k /data | awk 'NR == 2 { print $2 }')
+	# a filesystem under nine tenths of its partition was made for a smaller one
+	[ "$held" -ge $((sectors / 2 * 9 / 10)) ] || resize2fs "$device" >/dev/null 2>&1 || echo "frame-data: $device could not be grown" >&2
+fi
+install -d -o root -g root -m 0755 "$keep"
+install -d -o systemd-timesync -g systemd-timesync -m 0755 "$keep/timesync"
 # its clock file too: the user's number changes with the system
-chown -R systemd-timesync:systemd-timesync "$new/timesync"
-install -d -o root -g systemd-journal -m 2755 "$new/journal"
-install -d -o root -g root -m 0700 "$new/ssh"
-test -s "$new/ssh/ssh_host_ed25519_key" || ssh-keygen -q -t ed25519 -N "" -C "$(cat /etc/hostname)" -f "$new/ssh/ssh_host_ed25519_key"
+chown -R systemd-timesync:systemd-timesync "$keep/timesync"
+install -d -o root -g systemd-journal -m 2755 "$keep/journal"
+install -d -o root -g root -m 0700 "$keep/ssh"
+test -s "$keep/ssh/ssh_host_ed25519_key" || ssh-keygen -q -t ed25519 -N "" -C "$(cat /etc/hostname)" -f "$keep/ssh/ssh_host_ed25519_key"

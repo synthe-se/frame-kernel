@@ -17,7 +17,7 @@ use crate::hex;
 /// `frame-wifid`'s socket: its directory is root's, group `kiosk`.
 pub const SOCKET: &str = "/run/frame-wifi/socket";
 /// What the system reads the frame's network from.
-pub const CONF: &str = "/android-data/frame/wifi.conf";
+pub const CONF: &str = "/data/frame/wifi.conf";
 /// The longest request read (a name and a password, each escaped at worst).
 pub const MAX_REQUEST: u64 = 1024;
 

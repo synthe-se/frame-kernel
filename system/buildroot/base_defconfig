@@ -55,6 +55,11 @@ BR2_PACKAGE_OPENSSH_SERVER=y
 BR2_PACKAGE_OPENSSH_KEY_UTILS=y
 BR2_PACKAGE_KEXEC=y
 
+# The data partition is the frame's own to make and to grow: a frame refitted from its vendor's
+# layout, a new one whose first image is smaller than its eMMC
+BR2_PACKAGE_E2FSPROGS=y
+BR2_PACKAGE_E2FSPROGS_RESIZE2FS=y
+
 # Read-only, zstd: fast to read on the Cortex-A7
 BR2_TARGET_ROOTFS_SQUASHFS=y
 BR2_TARGET_ROOTFS_SQUASHFS4_ZSTD=y

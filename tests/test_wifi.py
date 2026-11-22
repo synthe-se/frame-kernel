@@ -35,7 +35,7 @@ def rooted(text: str, root: Path, *directories: str) -> str:
 
 
 class Wifi(unittest.TestCase):
-    PATHS = ("run", "sys", "android-data", "etc/wpa_supplicant", "etc/frame")
+    PATHS = ("run", "sys", "data", "etc/wpa_supplicant", "etc/frame")
     OPEN = ["systemctl restart frame-wpa", "systemctl --no-block start frame-setup", "networkctl reload", "systemctl restart product.service"]
     BACK = ["systemctl stop frame-setup", "systemctl restart frame-wpa", "networkctl reload", "systemctl restart product.service"]
     OPERSTATE = "echo %s >$ROOT/sys/class/net/wlan0/operstate"
@@ -49,7 +49,7 @@ class Wifi(unittest.TestCase):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
         root = self.root = Path(d.name)
-        frame = root / "android-data/frame"
+        frame = root / "data/frame"
         (frame / "slots").mkdir(parents=True)
         (frame / "slots/state").write_text(state)
         if wifi:

@@ -3,7 +3,7 @@
 [Unit]
 Description=The frame's update
 ConditionPathExists=/etc/frame/update-url
-RequiresMountsFor=/android-data
+RequiresMountsFor=/data
 Wants=network-online.target
 After=network-online.target time-sync.target
 

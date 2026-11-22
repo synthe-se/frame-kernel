@@ -1,7 +1,7 @@
 """The frame's initramfs: its /init (mksh) draws the boot picture, says in the kernel's log what
 came up (the display, the touch, the eMMC, the SDIO card), chooses a slot (an update on trial, a
-rollback, its kernel by kexec) and starts its system from userdata. It writes to the eMMC only
-there: the slots' state, and the top directory made root's. It names no product: the picture is
+rollback, its kernel by kexec) and starts its system from the data partition. It writes to the
+eMMC only there: the slots' state. It names no product: the picture is
 the slot's own (boot/splash.py), the frame's for want of one. With --debug (bring-up), it makes the
 USB-C port a root serial console (CDC ACM: /dev/cu.usbmodem* on macOS), blinks the backlight five
 times (a sign with no console at all, ~10 s) and waits 8 s before saying what came up. Tools:
@@ -110,7 +110,7 @@ say "input: $(echo $(cat /sys/class/input/*/name 2>/dev/null))"
 say "mmc: $(echo $(ls /sys/bus/mmc/devices 2>/dev/null))"
 say "sdio: $(echo $(cat /sys/bus/sdio/devices/*/vendor /sys/bus/sdio/devices/*/device 2>/dev/null))"
 
-# 4. userdata, and which system: two slots, a and b, each a system and perhaps a kernel, all of it
+# 4. the data partition, and which system: two slots, a and b, each a system and perhaps a kernel, all of it
 #    as its manifest says, signed by a product's release key (frame-seal). An update goes to the free slot and is tried for its tries, the
 #    active slot's boots counted the same way, each before it starts (a power cut or a crash spends
 #    one), until frame-commit says the frame works. Tries spent, 4 boots without a proof, or a
@@ -138,12 +138,18 @@ mac=$(printf '%s' "$(cat /sys/block/mmcblk0/device/cid)" | sha256sum | sed -E 's
 mkdir -p /kept && mount -t tmpfs -o mode=755 tmpfs /kept && cp /lib/modules/*.ko /bin/toybox /kept/ &&
 	mkdir /kept/sys && mount -t sysfs sys /kept/sys &&
 	cp -r /lib/firmware/aic8800_fw /kept/ && mount --bind /kept/aic8800_fw /lib/firmware/aic8800_fw
-data=$(grep -l "^PARTNAME=userdata$" /sys/class/block/*/uevent | head -1)
+# A maintenance start (bin/refit.sh, by kexec): the system came with this initramfs (/payload),
+# with what it needs to be reached; the data partition is not even looked at, to be made anew
+payload=
+[ ! -s /payload/rootfs.squashfs ] || payload=1
+# what it does is kept, to be said if it cannot start its system: nobody sees this console
+[ -z "$payload" ] || {{ exec 2>/tmp/trace; set -x; }}
+data=$([ -n "$payload" ] || grep -l "^PARTNAME=data$" /sys/class/block/*/uevent | head -1)
 {slots}
 # the release keys this image was built with: one of them signed the manifest of a slot that starts
 keys=$(echo /keys/*.pub)
 [ -e /keys/0.pub ] || keys=
-mkdir -p /android-data /lower /rw /newroot
+mkdir -p /data /lower /rw /newroot
 slot=
 trial=
 # the active slot as its last boot left it
@@ -178,7 +184,7 @@ choose() {{
 		# neither whole: nothing is mounted, the failure's line stays
 		whole "$active" || return 0
 	fi
-	# what cannot be counted (userdata full) still boots, and a slot failed for ever stops here
+	# what cannot be counted (the partition full) still boots, and a slot failed for ever stops here
 	if [ "${{boots:-0}}" -lt 8 ]; then remember "$active" "" 0 $((${{boots:-0}} + 1)); slot=$active; fi
 }}
 own_kernel() {{
@@ -188,7 +194,7 @@ own_kernel() {{
 	pkill frame-loader
 	line=$(uboot_line)
 	if kexec -l $here/zImage --dtb=$here/board.dtb --initrd=$here/initramfs.cpio.gz --command-line="$line frame.slot=$slot"; then
-		umount /android-data
+		umount /data
 		kexec -e
 		reboot -f
 	fi
@@ -205,8 +211,7 @@ if [ -n "$data" ]; then
 	# clean or journal replayed, it stops at the superblock; a full check (errors found) repairs
 	# without optimising
 	[ -n "$slot" ] || e2fsck -p -E fixes_only $device >/dev/null 2>&1
-	if mount -t ext4 -o rw,noatime,nosuid,nodev,noexec $device /android-data; then
-		settle
+	if mount -t ext4 -o rw,noatime,nosuid,nodev,noexec $device /data; then
 		if [ -n "$slot" ]; then
 			[ "$(key pending)" = "$slot" ] && trial=1
 		else
@@ -223,15 +228,24 @@ if [ -n "$data" ]; then
 	fi
 fi
 
-# 5. the system: its squashfs, read-only, a tmpfs over it, and userdata at /android-data, read-write
-#    for what the system keeps (/android-data/frame, and the product's own beside it); else the
-#    failure's line stays
+# 5. the system: its squashfs, read-only, a tmpfs over it, and the data partition at /data,
+#    read-write for what the system keeps (/data/frame, and the product's own beside it); else
+#    the failure's line stays
 img=$slots/$slot/rootfs.squashfs
+if [ -n "$payload" ]; then
+	# the system from RAM, kept where switch_root leaves it, and a /data of RAM too, holding what
+	# came with it (the Wi-Fi's network, the SSH host key)
+	say "maintenance: the system from RAM, the data partition untouched"
+	show /splash
+	mv /payload/rootfs.squashfs /kept/ && img=/kept/rootfs.squashfs && slot=ram
+	mount -t tmpfs -o mode=755 tmpfs /data && cp -a /payload/data/. /data/
+	wifi &
+fi
 if [ -n "$slot" ] && loop=$(losetup -f) && losetup -r $loop $img && mount -t squashfs -o ro $loop /lower &&
 	mount -t tmpfs -o mode=755 tmpfs /rw &&
 	mkdir -p /rw/upper /rw/work && mount -t overlay overlay -o lowerdir=/lower,upperdir=/rw/upper,workdir=/rw/work /newroot; then
 	say "system: $img"
-	chown 0:0 /android-data
+	chown 0:0 /data
 	# what of the Wi-Fi's firmware the kernel asks for once the system is the root, it finds there
 	mkdir -p /newroot/lib/firmware && cp -r /kept/aic8800_fw /newroot/lib/firmware/
 	# the panel and the touch panel are the product's from its first instant: its user's groups
@@ -245,16 +259,17 @@ if [ -n "$slot" ] && loop=$(losetup -f) && losetup -r $loop $img && mount -t squ
 	# systems left under random ids goes
 	id=$(sha256sum /sys/block/mmcblk0/device/cid | cut -c1-32)
 	echo "$id" >/newroot/etc/machine-id
-	for kept in /android-data/frame/journal /android-data/maison/journal; do
-		for old in $kept/*; do [ "$old" = $kept/$id ] || rm -rf "$old"; done
-	done
-	mkdir -p /newroot/android-data
-	mount --move /android-data /newroot/android-data
+	for old in /data/frame/journal/*; do [ "$old" = /data/frame/journal/$id ] || rm -rf "$old"; done
+	mkdir -p /newroot/data
+	mount --move /data /newroot/data
 	[ -z "$trial" ] || frame-guard 240 &
 {handover}	for m in dev proc sys; do mount --move /$m /newroot/$m; done
 	exec switch_root /newroot /sbin/init
 fi
 say "no system: slot $slot"
+# a maintenance start that could not start its system says why where the tools read it back
+# (bin/refit.sh): 4096 sectors into the partition it was to make anew, which holds nothing kept
+[ -z "$payload" ] || {{ set +x; {{ echo "frame-maintenance-log"; dmesg | tail -n 60; cat /tmp/trace; }} | dd of=/dev/mmcblk0 bs=512 seek=122880 conv=notrunc 2>/dev/null; sync; }}
 # what cannot even start spends its count here, so that the next boot chooses again
 [ -z "$slot" ] || reboot -f
 pkill frame-loader

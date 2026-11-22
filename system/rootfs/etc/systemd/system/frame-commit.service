@@ -1,7 +1,7 @@
 # What every boot proves (usr/local/sbin/frame-commit): not a oneshot, the boot does not wait.
 [Unit]
 Description=An update proving itself
-RequiresMountsFor=/android-data
+RequiresMountsFor=/data
 After=sshd.service
 
 [Service]

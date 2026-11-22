@@ -12,8 +12,11 @@ was measured. Each point was seen on the frame.
   DSI and its PHY.
 - The AIC8800DC answers only without the SoC's pulls on the SDIO lines (the board has its own),
   and with the vendor's power-on wait. No RTC on the board, despite the vendor's tree.
-- No partition table mainline reads: userdata alone is declared (`blkdevparts=` in the kernel's
-  command line, which has 1024 bytes, 700 of them U-Boot's).
+- No partition table mainline reads: one partition is declared (`blkdevparts=` in the kernel's
+  command line, which has 1024 bytes, 700 of them U-Boot's), the frame's own, `data`, everything
+  after `boot`. The vendor's Android is gone from the frame (`bin/refit.sh`): what is before
+  `boot` stays U-Boot's and is never written, and U-Boot starts `boot` without the vendor's
+  recovery (seen: its head zeroed, a cold start).
 - The touch chip's axes are swapped, 1024 down by 640 across; `touchscreen-size-*` are the
   chip's axes, before the swap.
 - simpledrm left beside Rockchip's card is a second card, where a client would draw unseen.
@@ -90,7 +93,7 @@ product does before its first picture.
 
 ## Slots, and what a frame trusts
 
-Userdata holds two slots, `/android-data/frame/slots/{a,b}`, root's: a system, its boot picture,
+Userdata holds two slots, `/data/frame/slots/{a,b}`, root's: a system, its boot picture,
 and perhaps a kernel, its device tree and its initramfs. `boot` is written by none of them, only
 by `bin/try.sh --flash`: its kernel is what any failure comes back to. `state` says `active`,
 `pending`, `tries` and `boots`.
@@ -121,10 +124,25 @@ check, an unreadable image that passes it, a kernel that panics, a kernel that h
 watchdog reset), a system whose Wi-Fi never comes up on trial.
 
 Two products on one frame (`bin/switch.sh`): the one that runs is copied aside whole
-(`/android-data/frame/parked/<product>`), checked, and the other comes back from there into the
+(`/data/frame/parked/<product>`), checked, and the other comes back from there into the
 free slot, on trial as any update. The free slot is any install's to overwrite. No install and
 no switch starts while a system is on trial: the tools read the frame's state whole or not at
 all (`bin/frame-state.sh`), an answer that did not come is never an empty answer.
+
+## A frame refitted
+
+`bin/refit.sh <product> prepare | dry | probe | go` turns a frame laid out by its vendor for
+Android into the frame's own: one ext4 partition after `boot` (with fs-verity), and the `boot`
+that knows it. It runs from a maintenance start: the product's system from RAM, started by kexec
+with what it needs to be reached (the Wi-Fi's network, the SSH host key) carried beside the
+initramfs, the eMMC unmounted. `boot` is written and read back, the partition made, what the
+frame kept put back (read from it first: a frame that had its Wi-Fi from Android's own file
+would have come back mute), the slot laid and checked, then a cold start. Nothing before `boot`
+is ever written: the tools refuse the sector. Between the partition's making and the restart the
+eMMC holds nothing that starts by itself; the way back is the reset pinhole, then
+`bin/rkwrite.py` for `boot` and for the small image of the partition `prepare` made
+(`build/refit/data.img`: `frame-data` grows it to the eMMC at its first boot). Done on the
+frame on 2026-11-22: 28.7 GB of data, 21 MB kept and found again, Maison's pairing included.
 
 ## Over the air
 
@@ -178,7 +196,7 @@ panics, a panic reboots after 5 s.
 ## The Wi-Fi
 
 `frame-wifi` writes what wpa_supplicant reads: the network the frame joined
-(`/android-data/frame/wifi.conf`), else the ones Android knew. A product whose interface lets a
+(`/data/frame/wifi.conf`). A product whose interface lets a
 person join a network asks for `frame-wifid` in its preset: root, it answers the product over
 `/run/frame-wifi/socket` (the directory 0750 root:kiosk), one JSON line each way: scan, list,
 connect, status, nothing else (`tools/src/wifi.rs`). It is the boundary: a name goes in hex, a

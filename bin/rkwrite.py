@@ -4,7 +4,7 @@ this frame, halfway through a write): it waits for the loader to come back, prov
 again, and goes on. Nothing is written until the addressing is proved against the backup: this
 frame's loader counts from its `parameter` (kernel sector − 8192), and uboot's first sector says so.
 
-    python3 bin/rkwrite.py <image> <partition>   e.g. build/boot.img mmcblk0p5
+    python3 bin/rkwrite.py <image> <partition>   e.g. build/boot.img mmcblk0p5, build/refit/data.img data
 
 BACKUP (~/maison-frame/backup: layout.txt, mmcblk0p1.img), RKDEVELOPTOOL (rkdeveloptool).
 """
@@ -26,8 +26,28 @@ def rk(*args) -> subprocess.CompletedProcess:
     return subprocess.run([RK, *map(str, args)], capture_output=True, text=True, timeout=600)
 
 
+def layout() -> dict[str, tuple[int, int]]:
+    """Each partition of layout.txt (the vendor's, from /sys/block/mmcblk0): its start and size."""
+    parts = {}
+    for line in (BACKUP / "layout.txt").read_text().split("\n"):
+        name, _, rest = line.partition(" start=")
+        if rest:
+            parts[name] = (int(rest.split()[0]), int(rest.split("size=")[1]))
+    return parts
+
+
+def data() -> tuple[int, int]:
+    """The frame's own partition, `data`: everything after `boot` (mmcblk0p5), to the end of the
+    vendor's last one."""
+    parts = layout()
+    start = sum(parts["mmcblk0p5"])
+    return start, max(a + n for a, n in parts.values()) - start
+
+
 def kernel_start(partition: str) -> int:
     """Where the kernel sees `partition` (layout.txt, from /sys/block/mmcblk0)."""
+    if partition == "data":
+        return data()[0]
     for line in (BACKUP / "layout.txt").read_text().split("\n"):
         name, _, rest = line.partition(" start=")
         if name == partition:
@@ -57,7 +77,10 @@ def offset() -> int | None:
 
 def write(image: Path, partition: str) -> None:
     total = image.stat().st_size // 512
-    size = int(next(l.split("size=")[1] for l in (BACKUP / "layout.txt").read_text().split("\n") if l.startswith(partition + " ")))
+    size = data()[1] if partition == "data" else layout()[partition][1]
+    # what is before `boot` is the loader's own and U-Boot's: never written from here
+    if kernel_start(partition) < layout()["mmcblk0p5"][0]:
+        raise SystemExit(f"{partition}: before boot, where the loader lives: not written")
     if image.stat().st_size % 512 or total > size:
         raise SystemExit(f"{image}: {total} sectors, the partition has {size}")
     progress = image.with_suffix(image.suffix + f".{partition}.progress")

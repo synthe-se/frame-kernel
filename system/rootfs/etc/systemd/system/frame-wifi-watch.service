@@ -2,7 +2,7 @@
 # (usr/local/sbin/frame-wifi-watch).
 [Unit]
 Description=The frame's network, watched
-RequiresMountsFor=/android-data
+RequiresMountsFor=/data
 After=frame-wifi.service frame-wpa.service
 
 [Service]

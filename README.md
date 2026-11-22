@@ -70,15 +70,15 @@ A directory of the product's repository. The frame's system is built around it:
 | `UPDATE_HOST` | where a release is published for them, as rsync names it (`host:/srv/updates/…`) |
 | `BUILDROOT_FIRST` | packages `build-target.sh` links, built before it |
 
-What a product may count on: the `kiosk` user (groups `video`, `render`, `input`), userdata at
-`/android-data` with a directory of its own to make there, `/etc/frame/` saying what the system
+What a product may count on: the `kiosk` user (groups `video`, `render`, `input`), the frame's
+data partition at `/data` with a directory of its own to make there, `/etc/frame/` saying what the system
 is, `frame-loader` to stop when it draws its first picture, and the accelerometer under
 `/sys/bus/iio`.
 
 ## How a frame starts
 
 U-Boot (the vendor's) draws a picture and starts the kernel in `boot`, which holds its
-initramfs. Its `/init` mounts userdata, where two slots, `a` and `b`, each hold a system (a
+initramfs. Its `/init` mounts the data partition, where two slots, `a` and `b`, each hold a system (a
 squashfs), its boot picture, and perhaps a kernel of its own; it draws the slot's picture,
 chooses the slot (an update on trial, a system that failed four boots, a slot not whole), and
 starts it under a tmpfs: the system runs from RAM and never writes to itself. `frame-commit`

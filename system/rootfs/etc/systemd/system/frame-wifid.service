@@ -2,7 +2,7 @@
 # directory (tools: frame-wifid). Keeps running while wpa_supplicant restarts.
 [Unit]
 Description=The frame's Wi-Fi, for its interface
-RequiresMountsFor=/android-data
+RequiresMountsFor=/data
 After=frame-wifi.service
 
 [Service]
@@ -15,7 +15,7 @@ RestartSec=2
 # what it may reach: wifi.conf, and wpa_supplicant's socket
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/android-data/frame
+ReadWritePaths=/data/frame
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

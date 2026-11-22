@@ -9,7 +9,7 @@ use std::process::Command;
 use std::time::Duration;
 use std::{fs, process};
 
-const SLOTS: &str = "/android-data/frame/slots";
+const SLOTS: &str = "/data/frame/slots";
 const CONFIG: &str = "/etc/frame/update-url";
 const VERSION: &str = "/etc/frame/version";
 
